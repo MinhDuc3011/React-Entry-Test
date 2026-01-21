@@ -3,85 +3,147 @@ import { useState, useRef } from "react";
 type Unit = "percent" | "px";
 
 const App = () => {
+  // Current numeric value
   const [value, setValue] = useState(100);
+
+  // Current unit type: percent or px
   const [unit, setUnit] = useState<Unit>("percent");
+
+  // Store last valid value when unit is percent (0–100)
   const [lastValidValue, setLastValidValue] = useState(100);
+
+  // Raw input value as string (for typing control)
   const [inputValue, setInputValue] = useState("100");
+
+  // Tooltip visibility state for stepper buttons
   const [showTooltip, setShowTooltip] = useState({
     decrease: false,
     increase: false,
   });
+
+  // Refs for stepper buttons (used to calculate tooltip position)
   const increaseRef = useRef<HTMLButtonElement>(null);
   const decreaseRef = useRef<HTMLButtonElement>(null);
+
+  // Tooltip position state
   const [tooltipPos, setTooltipPos] = useState({
     increase: { left: 0, top: 0 },
     decrease: { left: 0, top: 0 },
   });
 
+  /**
+   * Format number value for displaying in input
+   * - Integer: show without decimal
+   * - Float: keep 1 decimal place
+   */
   const formatValue = (val: number) =>
     Number.isInteger(val) ? String(val) : val.toFixed(1);
 
+  /**
+   * Clamp value based on current unit
+   * - Minimum value is 0
+   * - Percent unit cannot exceed 100
+   */
   const clampValue = (val: number) => {
     if (val < 0) return 0;
     if (unit === "percent" && val > 100) return lastValidValue;
     return val;
   };
 
+  /**
+   * Update value state with validation and formatting
+   * Also sync input value and last valid percent value
+   */
   const updateValue = (newValue: number) => {
     const clamped = clampValue(newValue);
+
     if (unit === "percent" && clamped >= 0 && clamped <= 100) {
       setLastValidValue(clamped);
     }
+
     setValue(clamped);
     setInputValue(formatValue(clamped));
   };
 
+  /**
+   * Handle unit change (percent / px)
+   * Auto-fix value if percent exceeds max limit
+   */
   const handleUnitChange = (newUnit: Unit) => {
     setUnit(newUnit);
+
     if (newUnit === "percent" && value > 100) {
       updateValue(100);
     }
   };
 
+  /**
+   * Handle input change while typing
+   * Replace comma with dot for decimal support
+   */
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(",", ".");
     setInputValue(val);
   };
 
+  /**
+   * Handle input blur (when user leaves input)
+   * Parse numeric value and fallback to 0 if invalid
+   */
   const handleInputBlur = () => {
     let input = inputValue.trim();
+
     if (!input) {
       updateValue(0);
       return;
     }
+
     input = input.replace(",", ".");
     const match = input.match(/-?\d+(\.\d+)?/);
     const cleanValue = match ? parseFloat(match[0]) : 0;
+
     updateValue(cleanValue);
   };
 
+  /**
+   * Handle increase/decrease stepper button click
+   */
   const handleStepper = (delta: number) => {
     const currentValue = parseFloat(inputValue) || 0;
     updateValue(currentValue + delta);
   };
 
+  /**
+   * Show tooltip and calculate its position on hover
+   */
   const handleMouseEnter = (action: "increase" | "decrease") => {
     const ref = action === "increase" ? increaseRef : decreaseRef;
+
     if (ref.current) {
       const rect = ref.current.getBoundingClientRect();
       setTooltipPos((prev) => ({
         ...prev,
-        [action]: { left: rect.left + rect.width / 2, top: rect.top - 38 },
+        [action]: {
+          left: rect.left + rect.width / 2,
+          top: rect.top - 38,
+        },
       }));
     }
+
     setShowTooltip((prev) => ({ ...prev, [action]: true }));
   };
 
+  /**
+   * Hide tooltip on mouse leave
+   */
   const handleMouseLeave = (action: "increase" | "decrease") => {
     setShowTooltip((prev) => ({ ...prev, [action]: false }));
   };
 
+  // Disable decrease button when value is 0
   const isDecreaseDisabled = value === 0;
+
+  // Disable increase button when percent reaches max value
   const isIncreaseDisabled = unit === "percent" && value === 100;
 
   return (
